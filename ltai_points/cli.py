@@ -1,14 +1,13 @@
 """Console script for ltai_points."""
 import sys
 import click
-
+from .settings import Settings
 
 @click.command()
 def main(args=None):
     """Console script for ltai_points."""
-    click.echo("Replace this message by putting your code into "
-               "ltai_points.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
+    settings = Settings()
+    click.echo(settings.api_endpoint)
     return 0
 
 
