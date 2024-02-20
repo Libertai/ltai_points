@@ -4,7 +4,7 @@ import click
 import asyncio
 from .settings import get_settings
 from .ethereum import get_account
-from .fetcher import get_aleph_rewards
+from .ltai_points import compute_points
 from . import __version__
 import logging
 
@@ -34,7 +34,7 @@ def main(verbose, args=None):
     print(settings)
     account = get_account(settings)
     LOGGER.info(f"Starting as address {account.get_address()}")
-    asyncio.run(get_aleph_rewards(settings))
+    asyncio.run(compute_points(settings))
     return 0
 
 
