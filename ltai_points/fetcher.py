@@ -56,9 +56,16 @@ async def get_aleph_rewards(settings):
     
     async with AlephHttpClient() as client:
         posts = fetch_posts(client,
-                            filter=PostFilter(channels=["FOUNDATION"], addresses=[settings['aleph_reward_sender']], tags=['distribution']))
+                            filter=PostFilter(channels=["FOUNDATION"],
+                                              addresses=[settings['aleph_reward_sender']],
+                                              tags=['distribution'],
+                                              types=['staking-rewards-distribution']),
+                            per_page=50)
         
         async for post in posts:
+            if 'mainnet' not in post.content['tags']:
+                continue
+            
             if post.time < settings['reward_start_ts']:
                 break
             

@@ -11,8 +11,8 @@ async def compute_points(settings):
     registrations, counts = await get_account_registrations(settings)
 
     async for reward_round, reward_time in get_aleph_rewards(settings):
-        decay = settings['daily_decay'] ** ((reward_time - settings['reward_start_ts']) / 86400)
-        distribution_ratio = decay * ratio
+        decay = settings['daily_decay'] ** int((reward_time - settings['reward_start_ts']) / 86400)
+        distribution_ratio = ratio * (1-decay)
 
         # now check which addresses should have the bonus for this round (only if they registered before the bonus limit, and before this distribution)
         bonus_addresses = [address for address, registration_time in registrations.items()
@@ -38,3 +38,5 @@ async def compute_points(settings):
     bonus_count = len([address for address in totals if address in all_bonus_addresses])
     total_count = len(totals)
     print(f"Total addresses: {total_count}, bonus addresses: {bonus_count}, ratio: {bonus_count/total_count}")
+    # now print the reward total
+    print(f"Total rewards: {sum(totals.values())}")
