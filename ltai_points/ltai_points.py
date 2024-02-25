@@ -22,6 +22,11 @@ async def compute_points(settings):
         print(f"Processing rewards for {reward_time} ({days_since_start} days since start)")
         decay = settings['daily_decay'] ** int((reward_time - settings['reward_start_ts']) / 86400)
         distribution_ratio = ratio * decay
+        
+        # decrease the bonus linearly over the bonus duration
+        distribution_bonus_ratio = 1 
+        if days_since_start < settings['bonus_duration']:
+            distribution_bonus_ratio = bonus_ratio * (1 - min(1, days_since_start / settings['bonus_duration']))
 
         # now check which addresses should have the bonus for this round (only if they registered before the bonus limit, and before this distribution)
         bonus_addresses = [address for address, registration_time in registrations.items()
@@ -36,7 +41,7 @@ async def compute_points(settings):
             reward = value * distribution_ratio
             round_rewards += reward
             if address in bonus_addresses:
-                reward *= bonus_ratio
+                reward *= distribution_bonus_ratio
 
             totals[address] += reward
         print(f"Round total: {round_total}, rewards: {round_rewards}, decay: {decay}, distribution ratio: {distribution_ratio}")
@@ -54,4 +59,4 @@ async def compute_points(settings):
     # now print the reward total
     print(f"Total rewards: {sum(totals.values())}")
     
-    return totals
+    return totals, all_bonus_addresses

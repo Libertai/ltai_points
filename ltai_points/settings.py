@@ -14,9 +14,11 @@ def get_settings():
         'aleph_reward_ratio': float(os.environ.get('ALEPH_REWARD_RATIO', '1.0')),
         'daily_decay': float(os.environ.get('DAILY_DECAY', '0.9966')),
         'bonus_ratio': float(os.environ.get('BONUS_RATIO', '1.5')),
+        'bonus_duration': int(os.environ.get('BONUS_DURATION', '365')),  # duration of the bonus in days
         # limit date to register for the bonus '2024-02-26 12:00:00'
         'bonus_limit_ts': datetime.fromisoformat(os.environ.get('BONUS_LIMIT_DATE', '2024-02-26 12:00:00').replace('Z', '+00:00')).replace(tzinfo=timezone.utc).timestamp(),
         'channel': os.environ.get('CHANNEL', 'LIBERTAI'),
         'tag': os.environ.get('TAG', 'mainnet'),
         'post_type': os.environ.get('POST_TYPE', 'calculation'),
+        'aggregate_key': os.environ.get('AGGREGATE_KEY', 'points'),
     }
