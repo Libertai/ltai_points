@@ -51,6 +51,18 @@ async def fetch_messages(client, filter, per_page=20):
     
     for message in messages.messages:
         yield message
+        
+async def get_pending_rewards(settings):
+    # we only get one post, the last one
+    async with AlephHttpClient() as client:
+        posts = await client.get_posts(
+            post_filter=PostFilter(channels=["FOUNDATION"],
+                                   addresses=[settings['aleph_calculation_sender']],
+                                   tags=['calculation'],
+                                   types=['staking-rewards-distribution']),
+            page_size=1
+        )
+        return posts.posts[0].content['rewards'], posts.posts[0].time
 
 async def get_aleph_rewards(settings):
     

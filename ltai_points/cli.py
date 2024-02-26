@@ -28,9 +28,9 @@ def setup_logging(verbose):
 async def process(settings, publish=False):
     account = get_account(settings)
     LOGGER.info(f"Starting as address {account.get_address()}")
-    points, boosted_addresses = await compute_points(settings)
+    points, pending_points, info = await compute_points(settings)
     if publish:
-        await post_state(settings, points, boosted_addresses)
+        await post_state(settings, points, pending_points, info)
     return points
 
 @click.command()

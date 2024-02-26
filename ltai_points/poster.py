@@ -16,7 +16,7 @@ from aleph.sdk.client import AuthenticatedAlephHttpClient
 #         )
 #         print(status, message)
         
-async def post_state(settings, points, boosted_addresses):
+async def post_state(settings, points, pending_points, info):
     account = get_account(settings)
     async with AuthenticatedAlephHttpClient(account, api_server=settings['api_endpoint']) as client:
         message, status = await client.create_aggregate(
@@ -26,10 +26,14 @@ async def post_state(settings, points, boosted_addresses):
         )
         print(status, message)
         message, status = await client.create_aggregate(
+            settings['pending_aggregate_key'],
+            pending_points,
+            channel=settings['channel'],
+        )
+        print(status, message)
+        message, status = await client.create_aggregate(
             'info',
-            {
-                "boosted_addresses": boosted_addresses,
-            },
+            info,
             channel=settings['channel'],
         )
         print(status, message)
