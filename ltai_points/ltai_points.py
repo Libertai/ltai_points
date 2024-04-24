@@ -1,5 +1,5 @@
 """Main module."""
-from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards
+from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards, get_corechannel_messages
 import pprint
 
 async def process_round(reward_round, reward_time, totals, registrations, settings):
@@ -40,6 +40,7 @@ async def compute_points(settings):
     totals = {}
 
     registrations, counts = await get_account_registrations(settings)
+    print(f"Found {len(registrations)} registrations")
     
     all_bonus_addresses = [address for address, registration_time in registrations.items()
                            if registration_time < settings['bonus_limit_ts']]
@@ -60,6 +61,9 @@ async def compute_points(settings):
         if reward_time < first_time or first_time == 0:
             first_time = reward_time
         await process_round(reward_round, reward_time, totals, registrations, settings)
+
+    async for staked_amounts, timestamp in get_corechannel_messages(settings):
+        continue
         
 
     pprint.pprint({

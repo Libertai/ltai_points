@@ -1,4 +1,5 @@
 import math
+from datetime import datetime, timezone, date
 from aleph.sdk.client import AlephHttpClient
 from aleph.sdk.query.filters import PostFilter, MessageFilter
 from aleph_message.models import MessageType
@@ -48,10 +49,71 @@ async def fetch_messages(client, filter, per_page=20):
                 page=page, 
                 page_size=per_page
             )
+
+            print('page', page, '/', target_pages)
     
     for message in messages.messages:
         yield message
-        
+
+async def fetch_sampled_messages(client, filter, per_day=10):
+    # we get the stat_date of the filter
+    start_date = filter.start_date
+    now = datetime.now(timezone.utc).timestamp()
+    # we get the number of days between the start and now
+    days = (now - start_date) / 86400
+    # we get the first batch to get the pagination info
+    messages = await client.get_messages(
+        message_filter=filter, 
+        page_size=per_day
+    )
+
+    per_day = int(per_day / 2)
+
+    # we get the number of messages per day
+    messages_per_day = messages.pagination_total / days
+
+    # we get the number of pages total
+    target_pages = math.ceil(messages.pagination_total / per_day)
+    last_date = None
+
+    if target_pages > 1:
+        for page in range(2, target_pages+1):
+            # should we skip this page as we already got something that day?
+            # we process twice per day anyway, just in case
+            if page % (int(messages_per_day/per_day)/2):
+                continue
+
+            for message in messages.messages:
+                if message.time.date() == last_date:
+                    continue
+
+                yield message
+                last_date = message.time.date()
+                print(message.time.date())
+
+            messages = await client.get_messages(
+                message_filter=filter,
+                page=page, 
+                page_size=per_day
+            )
+            print('page', page, '/', target_pages)
+
+    for message in messages.messages:
+        if message.time.date() == last_date:
+            continue
+
+        yield message
+        last_date = message.time.date()
+
+    
+
+    target_pages = math.ceil(messages.pagination_total / messages.pagination_per_page)
+    # we get the total number of messages
+    total_messages = messages.pagination_total
+    # we get the number of messages to get
+    messages_to_get = int(messages_per_day * days)
+
+
 async def get_pending_rewards(settings):
     # we only get one post, the last one
     async with AlephHttpClient() as client:
@@ -63,9 +125,28 @@ async def get_pending_rewards(settings):
             page_size=1
         )
         return posts.posts[0].content['rewards'], posts.posts[0].time
+    
+async def get_corechannel_messages(settings):
+    async with AlephHttpClient() as client:
+        messages = fetch_sampled_messages(client,
+                                  filter=MessageFilter(channels=["FOUNDATION"],
+                                                       message_types=[MessageType.aggregate],
+                                                       addresses=[settings['aleph_corechannel_sender']],
+                                                       start_date=settings['reward_start_ts']),
+                                  per_day=10)
+        
+        async for message in messages:
+            message_totals = {}
+            if message.content.key == "corechannel":
+                for node in message.content.content['nodes']:
+                    node_address = node.get('reward_address', node['owner'])
+                    message_totals[node_address] = message_totals.get(node_address, 0) + 200000
+                    for address, amount in node['stakers'].items():
+                        message_totals[address] = message_totals.get(address, 0) + amount
+
+            yield(message_totals, message.time)
 
 async def get_aleph_rewards(settings):
-    
     async with AlephHttpClient() as client:
         posts = fetch_posts(client,
                             filter=PostFilter(channels=["FOUNDATION"],
@@ -98,7 +179,9 @@ async def get_account_registrations(settings):
     counts = {}
     async with AlephHttpClient() as client:
         messages = fetch_messages(client,
-                                  filter=MessageFilter(channels=["LIBERTAI"], message_types=[MessageType.aggregate]),
+                                  filter=MessageFilter(channels=["LIBERTAI"],
+                                                       message_types=[MessageType.aggregate],
+                                                       end_date=settings['bonus_limit_ts']),
                                   per_page=1000)
         
         async for message in messages:
