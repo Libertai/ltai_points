@@ -94,11 +94,32 @@ async def compute_points(settings, dbs):
             first_time = reward_time
         await process_round(reward_round, reward_time, totals, registrations, settings)
 
+    last_date = None
+    last_staked_amounts = None
     async for ddate, staked_amounts in get_staked_amounts(settings, dbs):
+        if last_date is None or ddate > last_date:
+            last_date = ddate
+            last_staked_amounts = staked_amounts
         await process_virtual_daily_round(ddate, staked_amounts, totals, registrations, settings)
+
+    # now we do a virtual pending based on last amounts for this date
+    # what part of the day as a ratio has passed ?
+    # last_date is a string, let's get a timestamp at utc
+    last_time = datetime.fromisoformat(last_date).replace(tzinfo=timezone.utc).timestamp()
+    pending_ratio = (datetime.now(timezone.utc).timestamp() - last_time) / 86400
+    day_pending_reward = {}
+    await process_virtual_daily_round(last_date, last_staked_amounts, day_pending_reward, registrations, settings)
+    day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
+    # now we merge this with the existing pending
+    pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
+    pending_time = datetime.now(timezone.utc).timestamp()
+
 
     pprint.pprint({
         address: (value, address in all_bonus_addresses) for address, value in totals.items()
+    })
+    pprint.pprint({
+        address: value for address, value in pending_totals.items()
     })
 
     # now let's print the count of addresses that have the bonus compared to the ones that don't
