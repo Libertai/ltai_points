@@ -112,7 +112,7 @@ async def compute_points(settings, dbs):
     day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
     # now we merge this with the existing pending
     pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
-    pending_time = datetime.now(timezone.utc).timestamp()
+    
 
 
     pprint.pprint({
