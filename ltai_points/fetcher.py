@@ -158,7 +158,7 @@ async def get_staked_amounts(settings, dbs):
                     continue
 
                 for node in message.content.content['nodes']:
-                    node_address = node.get('reward_address', node['owner'])
+                    node_address = node.get('reward', node['owner'])
                     message_totals[node_address] = message_totals.get(node_address, 0) + 200000
                     for address, amount in node['stakers'].items():
                         message_totals[address] = message_totals.get(address, 0) + amount
