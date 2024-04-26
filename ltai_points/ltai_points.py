@@ -93,22 +93,30 @@ async def compute_points(settings, dbs):
         if reward_time < first_time or first_time == 0:
             first_time = reward_time
         await process_round(reward_round, reward_time, totals, registrations, settings)
+        
+    pending_date = datetime.fromtimestamp(pending_time, timezone.utc).date().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
 
-    last_date = None
-    last_staked_amounts = None
+    today_staked_amounts = None
     async for ddate, staked_amounts in get_staked_amounts(settings, dbs):
-        if last_date is None or ddate > last_date:
-            last_date = ddate
-            last_staked_amounts = staked_amounts
+        
+        dtotals = totals
+        if ddate >= pending_date:
+            dtotals = pending_totals
+            
+            if ddate == today:
+                today_staked_amounts = staked_amounts
+                continue
+            
         await process_virtual_daily_round(ddate, staked_amounts, totals, registrations, settings)
 
-    # now we do a virtual pending based on last amounts for this date
+    # now we do a virtual pending based on last amounts for today
     # what part of the day as a ratio has passed ?
     # last_date is a string, let's get a timestamp at utc
-    last_time = datetime.fromisoformat(last_date).replace(tzinfo=timezone.utc).timestamp()
-    pending_ratio = (datetime.now(timezone.utc).timestamp() - last_time) / 86400
+    today_time = datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp()
+    pending_ratio = (datetime.now(timezone.utc).timestamp() - today_time) / 86400
     day_pending_reward = {}
-    await process_virtual_daily_round(last_date, last_staked_amounts, day_pending_reward, registrations, settings)
+    await process_virtual_daily_round(today, today_staked_amounts, day_pending_reward, registrations, settings)
     day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
     # now we merge this with the existing pending
     pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
@@ -128,6 +136,7 @@ async def compute_points(settings, dbs):
     print(f"Total addresses: {total_count}, bonus addresses: {bonus_count}, ratio: {bonus_count/total_count}")
     # now print the reward total
     print(f"Total rewards: {sum(totals.values())}")
+    print(f"Total pending: {sum(pending_totals.values())}")
     
     info = {
         "first_time": first_time,
