@@ -6,6 +6,7 @@ from .settings import get_settings
 from .ethereum import get_account
 from .poster import post_state
 from .ltai_points import compute_points
+from .storage import get_dbs, close_dbs
 from . import __version__
 import logging
 
@@ -25,10 +26,10 @@ def setup_logging(verbose):
         level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
     
-async def process(settings, publish=False):
+async def process(settings, dbs, publish=False):
     account = get_account(settings)
     LOGGER.info(f"Starting as address {account.get_address()}")
-    points, pending_points, info = await compute_points(settings)
+    points, pending_points, info = await compute_points(settings, dbs)
     if publish:
         await post_state(settings, points, pending_points, info)
     return points
@@ -41,7 +42,9 @@ def main(verbose, publish=False, args=None):
     """Console script for ltai_points."""
     setup_logging(verbose)
     settings = get_settings()
-    asyncio.run(process(settings, publish))
+    dbs = get_dbs(settings)
+    asyncio.run(process(settings, dbs, publish))
+    close_dbs(dbs)
     return 0
 
 
