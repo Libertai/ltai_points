@@ -1,5 +1,6 @@
 """Main module."""
-from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards, get_corechannel_messages
+from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards, get_staked_amounts
+from datetime import datetime, timezone
 import pprint
 
 async def process_round(reward_round, reward_time, totals, registrations, settings):
@@ -34,7 +35,38 @@ async def process_round(reward_round, reward_time, totals, registrations, settin
         totals[address] += reward
     print(f"Round total: {round_total}, rewards: {round_rewards}, decay: {decay}, distribution ratio: {distribution_ratio}")
 
-async def compute_points(settings):
+async def process_virtual_daily_round(round_date, staked_amounts, totals, registrations, settings):
+    ratio = settings['staked_ratio']
+    bonus_ratio = settings['bonus_ratio']
+    reward_time = datetime.fromisoformat(round_date).replace(tzinfo=timezone.utc).timestamp()
+    days_since_start = int(reward_time - settings['reward_start_ts']) / 86400
+    stakers_daily_base = settings['aleph_reward_stakers_daily_base']
+    nodes_daily_base = settings['aleph_reward_nodes_daily_base']
+    daily_base = stakers_daily_base + nodes_daily_base
+    decay = settings['daily_decay'] ** days_since_start
+    daily_ltai = daily_base * decay * ratio
+
+    total_staked = sum(staked_amounts.values())
+    ltai_ratio = daily_ltai / total_staked
+
+    distribution_bonus_ratio = 1
+    bonus_addresses = [address for address, registration_time in registrations.items()
+                        if registration_time < reward_time and registration_time < settings['bonus_limit_ts']]
+    if reward_time < settings['bonus_limit_ts']:
+        distribution_bonus_ratio = bonus_ratio * (1 - min(1, days_since_start / settings['bonus_duration']))
+    
+    for address, value in staked_amounts.items():
+        if address not in totals:
+            totals[address] = 0
+        reward = value * ltai_ratio
+        if address in bonus_addresses:
+            reward *= distribution_bonus_ratio
+        totals[address] += reward
+
+    print(daily_ltai)
+    print(round_date, sum(staked_amounts.values()))
+
+async def compute_points(settings, dbs):
     ratio = settings['aleph_reward_ratio']
     bonus_ratio = settings['bonus_ratio']
     totals = {}
@@ -62,9 +94,8 @@ async def compute_points(settings):
             first_time = reward_time
         await process_round(reward_round, reward_time, totals, registrations, settings)
 
-    async for staked_amounts, timestamp in get_corechannel_messages(settings):
-        continue
-        
+    async for ddate, staked_amounts in get_staked_amounts(settings, dbs):
+        await process_virtual_daily_round(ddate, staked_amounts, totals, registrations, settings)
 
     pprint.pprint({
         address: (value, address in all_bonus_addresses) for address, value in totals.items()

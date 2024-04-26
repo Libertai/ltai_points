@@ -55,7 +55,7 @@ async def fetch_messages(client, filter, per_page=20):
     for message in messages.messages:
         yield message
 
-async def fetch_sampled_messages(client, filter, per_day=10):
+async def fetch_sampled_messages(client, filter, per_day=12, splits=4):
     # we get the stat_date of the filter
     start_date = filter.start_date
     now = datetime.now(timezone.utc).timestamp()
@@ -67,7 +67,7 @@ async def fetch_sampled_messages(client, filter, per_day=10):
         page_size=per_day
     )
 
-    per_day = int(per_day / 2)
+    per_day = int(per_day / splits)
 
     # we get the number of messages per day
     messages_per_day = messages.pagination_total / days
@@ -80,7 +80,7 @@ async def fetch_sampled_messages(client, filter, per_day=10):
         for page in range(2, target_pages+1):
             # should we skip this page as we already got something that day?
             # we process twice per day anyway, just in case
-            if page % (int(messages_per_day/per_day)/2):
+            if page % (int(messages_per_day/per_day)/splits):
                 continue
 
             for message in messages.messages:
@@ -126,25 +126,45 @@ async def get_pending_rewards(settings):
         )
         return posts.posts[0].content['rewards'], posts.posts[0].time
     
-async def get_corechannel_messages(settings):
+async def get_staked_amounts(settings, dbs):
+    staked_db = dbs['staked_amounts']
+    last_date = await staked_db.get_last_available_key()
+    print(last_date)
+    if last_date is None:
+        last_date = settings['reward_start_ts']
+    else:
+        last_date = datetime.fromisoformat(last_date).timestamp()
+        print(last_date)
+
+    seen_dates = set()
+
+    async for key, values in staked_db.retrieve_entries():
+        yield key, values
+        seen_dates.add(key)
+
     async with AlephHttpClient() as client:
         messages = fetch_sampled_messages(client,
                                   filter=MessageFilter(channels=["FOUNDATION"],
                                                        message_types=[MessageType.aggregate],
                                                        addresses=[settings['aleph_corechannel_sender']],
-                                                       start_date=settings['reward_start_ts']),
+                                                       start_date=float(last_date)),
                                   per_day=10)
         
         async for message in messages:
-            message_totals = {}
             if message.content.key == "corechannel":
+                message_totals = {}
+                message_date = message.time.date().isoformat()
+                if message_date in seen_dates:
+                    continue
+
                 for node in message.content.content['nodes']:
                     node_address = node.get('reward_address', node['owner'])
                     message_totals[node_address] = message_totals.get(node_address, 0) + 200000
                     for address, amount in node['stakers'].items():
                         message_totals[address] = message_totals.get(address, 0) + amount
 
-            yield(message_totals, message.time)
+                yield (message_date, message_totals)
+                await staked_db.store_entry(message_date, message_totals)
 
 async def get_aleph_rewards(settings):
     async with AlephHttpClient() as client:
