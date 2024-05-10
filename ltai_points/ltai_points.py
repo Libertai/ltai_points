@@ -53,7 +53,7 @@ async def process_virtual_daily_round(round_date, staked_amounts, totals, regist
     bonus_addresses = [address for address, registration_time in registrations.items()
                         if registration_time < reward_time and registration_time < settings['bonus_limit_ts']]
     if reward_time < settings['bonus_limit_ts']:
-        distribution_bonus_ratio = bonus_ratio * (1 - min(1, days_since_start / settings['bonus_duration']))
+        distribution_bonus_ratio = 1 + ((bonus_ratio-1) * (1 - min(1, days_since_start / settings['bonus_duration'])))
     
     for address, value in staked_amounts.items():
         if address not in totals:
