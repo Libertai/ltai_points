@@ -50,6 +50,7 @@ class Storage:
 def get_dbs(settings):
     return {
         'staked_amounts': Storage(settings['db_path'], 'staked_amounts'),
+        'corechannel_status': Storage(settings['db_path'], 'corechannel_status'),
     }
 
 def close_dbs(dbs):

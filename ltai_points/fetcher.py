@@ -166,6 +166,38 @@ async def get_staked_amounts(settings, dbs):
                 yield (message_date, message_totals)
                 await staked_db.store_entry(message_date, message_totals)
 
+async def get_corechanel_statuses(settings, dbs):
+    corechanel_db = dbs['corechannel_status']
+    last_date = await corechanel_db.get_last_available_key()
+    print(last_date)
+    if last_date is None:
+        last_date = settings['reward_start_ts']
+    else:
+        last_date = datetime.fromisoformat(last_date).timestamp()
+        print(last_date)
+    
+    seen_dates = set()
+
+    async for key, values in corechanel_db.retrieve_entries():
+        yield key, values
+        seen_dates.add(key)
+
+    async with AlephHttpClient() as client:
+        messages = fetch_sampled_messages(client,
+                                  filter=MessageFilter(channels=["FOUNDATION"],
+                                                       message_types=[MessageType.aggregate],
+                                                       addresses=[settings['aleph_corechannel_sender']],
+                                                       start_date=float(last_date)))
+        
+        async for message in messages:
+            if message.content.key == "corechannel":
+                message_date = message.time.date().isoformat()
+                if message_date in seen_dates:
+                    continue
+
+                yield (message_date, message.content.content)
+                await corechanel_db.store_entry(message_date, message.content.content)
+
 async def get_aleph_rewards(settings):
     async with AlephHttpClient() as client:
         posts = fetch_posts(client,
