@@ -108,7 +108,7 @@ async def compute_points(settings, dbs):
                 today_staked_amounts = staked_amounts
                 continue
             
-        await process_virtual_daily_round(ddate, staked_amounts, totals, registrations, settings)
+        await process_virtual_daily_round(ddate, staked_amounts, dtotals, registrations, settings)
 
     # now we do a virtual pending based on last amounts for today
     # what part of the day as a ratio has passed ?
