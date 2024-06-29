@@ -13,7 +13,10 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'Click>=7.0',
     'aleph-sdk-python>=0.8.0',
-    'plyvel>=1.5.0'
+    'plyvel>=1.5.0',
+    'python-dotenv',
+    'setuptools',
+    'web3'
 ]
 
 test_requirements = [ ]
