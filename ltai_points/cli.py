@@ -29,18 +29,20 @@ def setup_logging(verbose):
     
 async def process(settings, dbs, publish=False, mint=False):
     account = get_account(settings)
+    
+    web3 = get_web3(settings)
+    previous_mints = await get_all_previous_mints(settings, web3)
+    
     LOGGER.info(f"Starting as address {account.get_address()}")
-    points, pending_points, info = await compute_points(settings, dbs)
+    points, pending_points, info = await compute_points(settings, dbs, previous_mints)
     if publish:
         await post_state(settings, points, pending_points, info)
     if mint:
-        web3 = get_web3(settings)
-        previous_mints = await get_all_previous_mints(settings, web3)
-        print(previous_mints)
         to_send = {}
-        for address, amount in points.items():
-            if amount - previous_mints.get(address, 0) > 1:
-                to_send[address] = amount - previous_mints.get(address, 0)
+        for address, amount in pending_points.items():
+            if amount > 1:
+                to_send[address] = amount
+                
         print(to_send)
 
         max_items = settings['ethereum_batch_size']

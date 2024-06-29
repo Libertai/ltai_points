@@ -210,13 +210,19 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
     print(daily_ltai)
     print(round_date, sum(staked_amounts.values()))
 
-async def compute_points(settings, dbs):
+async def compute_points(settings, dbs, previous_mints):
+    w3 = web3.Web3()
     ratio = settings['aleph_reward_ratio']
     bonus_ratio = settings['bonus_ratio']
     totals = {}
 
     registrations, counts = await get_account_registrations(settings)
     print(f"Found {len(registrations)} registrations")
+            
+    settings_bonus_addresses = [w3.to_checksum_address(address) for address in settings['bonus_addresses']]
+    for address in settings_bonus_addresses:
+        if address not in totals:
+            totals[address] = 1000
     
     all_bonus_addresses = [address for address, registration_time in registrations.items()
                            if registration_time < settings['bonus_limit_ts']]
@@ -264,10 +270,19 @@ async def compute_points(settings, dbs):
     day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
     # now we merge this with the existing pending
     # pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
-    pending_totals = day_pending_reward
+    # pending_totals = day_pending_reward
     
-
-
+    # we take the sent part of the totals, move the unsent to pending
+    for address, value in totals.items():
+        if address in previous_mints:
+            sent = previous_mints[address]
+            # if value > sent:
+            pending_totals[address] = max(value - sent, 0)
+            totals[address] = sent
+        else:
+            pending_totals[address] = value
+            totals[address] = 0
+    
     pprint.pprint({
         address: (value, address in all_bonus_addresses) for address, value in totals.items()
     })

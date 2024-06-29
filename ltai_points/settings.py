@@ -33,8 +33,8 @@ def get_settings():
         'channel': os.environ.get('CHANNEL', 'LIBERTAI'),
         'tag': os.environ.get('TAG', 'mainnet'),
         'post_type': os.environ.get('POST_TYPE', 'calculation'),
-        'aggregate_key': os.environ.get('AGGREGATE_KEY', 'points'),
-        'pending_aggregate_key': os.environ.get('PENDING_AGGREGATE_KEY', 'pending_points'),
+        'aggregate_key': os.environ.get('AGGREGATE_KEY', 'tokens'),
+        'pending_aggregate_key': os.environ.get('PENDING_AGGREGATE_KEY', 'pending_tokens'),
         'db_path': os.environ.get('DB_PATH', './database'),
         'bonus_addresses': os.environ.get('BONUS_ADDRESSES', '').split(','),  # list of addresses to receive the bonus
     }
