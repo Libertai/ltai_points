@@ -111,6 +111,7 @@ async def get_logs_query(web3, contract,
                    start_height, end_height, topics,
                    load_mode='rpc', explorer_api_key=None,
                    explorer_api_path=None):
+    LOGGER.debug(f'getting events for {start_height} to {end_height}')
     if load_mode == 'rpc':
         try:
             w3_get_logs = web3.eth.getLogs
@@ -160,7 +161,7 @@ async def get_logs(web3, contract, start_height, topics=None, load_mode="rpc",
         # we got an error, let's try the pagination aware version.
         if (getattr(e, 'args')
                 and len(e.args)
-                and e.args[0]['code'] not in [-32005, -32000, -32603, -32701]):
+                and not (-33000 < e.args[0]['code'] <= -32000)):
             return
 
         try:
@@ -170,7 +171,7 @@ async def get_logs(web3, contract, start_height, topics=None, load_mode="rpc",
 #         if (start_height < config.ethereum.start_height.value):
 #             start_height = config.ethereum.start_height.value
 
-        end_height = start_height + 50000
+        end_height = start_height + 2000
 
         while True:
             try:
@@ -181,15 +182,16 @@ async def get_logs(web3, contract, start_height, topics=None, load_mode="rpc",
                     yield log
 
                 start_height = end_height + 1
-                end_height = start_height + 50000
+                end_height = start_height + 2000
 
                 if start_height > last_block:
                     logger.info("Ending big batch sync")
                     break
 
             except ValueError as e:
-                if e.args[0]['code'] in [-32005, -32000, -32603]:
-                    end_height = start_height + 10000
+                LOGGER.error(f"Error getting logs: {e}")
+                if -33000 < e.args[0]['code'] <= -32000:
+                    end_height = start_height + 200
                 else:
                     raise
 
