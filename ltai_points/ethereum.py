@@ -202,6 +202,7 @@ async def get_all_previous_mints(settings, web3, logger=LOGGER, load_mode='rpc')
 
     topic = construct_event_topic_set(abi, web3.codec)
     mints = {}
+    last_height = settings['ethereum_min_height']
 
     async for i in get_logs(web3, tokens, settings['ethereum_min_height'], topics=topic,
                             load_mode=load_mode, logger=logger):
@@ -216,7 +217,13 @@ async def get_all_previous_mints(settings, web3, logger=LOGGER, load_mode='rpc')
         address = tx_detail['to']
         amount = tx_detail['value'] / (10**18)
         mints[address] = mints.get(address, 0) + amount
-    return mints
+        if evt_data['blockNumber'] > last_height:
+            last_height = evt_data['blockNumber']
+    # get last block timestamp
+    last_block = web3.eth.get_block(last_height)
+    last_block_timestamp = last_block.timestamp
+    
+    return mints, last_block_timestamp
 
 
 

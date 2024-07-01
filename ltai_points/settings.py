@@ -35,6 +35,7 @@ def get_settings():
         'post_type': os.environ.get('POST_TYPE', 'calculation'),
         'aggregate_key': os.environ.get('AGGREGATE_KEY', 'tokens'),
         'pending_aggregate_key': os.environ.get('PENDING_AGGREGATE_KEY', 'pending_tokens'),
+        'estimated_aggregate_key': os.environ.get('ESTIMATED_AGGREGATE_KEY', 'estimated_3yr_tokens'),
         'db_path': os.environ.get('DB_PATH', './database'),
         'bonus_addresses': os.environ.get('BONUS_ADDRESSES', '').split(','),  # list of addresses to receive the bonus
     }

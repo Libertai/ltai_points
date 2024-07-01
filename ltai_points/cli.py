@@ -31,12 +31,13 @@ async def process(settings, dbs, publish=False, mint=False):
     account = get_account(settings)
     
     web3 = get_web3(settings)
-    previous_mints = await get_all_previous_mints(settings, web3)
+    previous_mints, last_mint_time = await get_all_previous_mints(settings, web3)
     
     LOGGER.info(f"Starting as address {account.get_address()}")
-    points, pending_points, info = await compute_points(settings, dbs, previous_mints)
+    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints)
+    info['last_time'] = last_mint_time
     if publish:
-        await post_state(settings, points, pending_points, info)
+        await post_state(settings, points, pending_points, estimated_points, info)
     if mint:
         to_send = {}
         for address, amount in pending_points.items():

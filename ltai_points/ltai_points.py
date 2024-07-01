@@ -1,6 +1,6 @@
 """Main module."""
 from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards, get_staked_amounts, get_corechanel_statuses
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from .ethereum import get_web3
 import pprint
 import math
@@ -207,8 +207,8 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
             sreward = ((value / total_staked) * per_day_stakers) * this_node_modifier
             increment_address_amount(addr, sreward*distrib_decayed_ratio)
 
-    print(daily_ltai)
-    print(round_date, sum(staked_amounts.values()))
+    # print(daily_ltai)
+    # print(round_date, sum(staked_amounts.values()))
 
 async def compute_points(settings, dbs, previous_mints):
     w3 = web3.Web3()
@@ -245,7 +245,8 @@ async def compute_points(settings, dbs, previous_mints):
     #     await process_round(reward_round, reward_time, totals, registrations, settings)
         
     # pending_date = datetime.fromtimestamp(pending_time, timezone.utc).date().isoformat()
-    today = datetime.now(timezone.utc).date().isoformat()
+    today_date = datetime.now(timezone.utc).date()
+    today = today_date.isoformat()
 
     today_status = None
     async for ddate, status in get_corechanel_statuses(settings, dbs):
@@ -268,6 +269,15 @@ async def compute_points(settings, dbs, previous_mints):
     day_pending_reward = {}
     await process_virtual_daily_round(today, today_status, day_pending_reward, registrations, settings)
     day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
+
+    # let's create an estimate of rewards over the next 36 months based on just today if everyone stays the same
+    estimates_totals = {}
+    for i in range(365*3):
+        day = (today_date + timedelta(days=i)).isoformat()
+        await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
+
+
+
     # now we merge this with the existing pending
     # pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
     # pending_totals = day_pending_reward
@@ -299,9 +309,6 @@ async def compute_points(settings, dbs, previous_mints):
     print(f"Total pending: {sum(pending_totals.values())}")
     
     info = {
-        "first_time": first_time,
-        "last_time": last_time,
-        # "pending_time": pending_time,
         "ratio": ratio,
         "reward_start": settings['reward_start_ts'],
         "daily_decay": settings['daily_decay'],
@@ -309,4 +316,4 @@ async def compute_points(settings, dbs, previous_mints):
         "boosted_addresses": all_bonus_addresses,
     }
     
-    return totals, pending_totals, info
+    return totals, pending_totals, estimates_totals, info
