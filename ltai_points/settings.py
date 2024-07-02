@@ -15,6 +15,7 @@ def get_settings():
         'aleph_reward_resource_node_monthly_base': int(os.environ.get('ALEPH_REWARD_RESOURCE_NODE_MONTHLY_BASE', '250')),
         'aleph_reward_resource_node_monthly_variable': int(os.environ.get('ALEPH_REWARD_RESOURCE_NODE_MONTHLY_VARIABLE', '1250')),
         'reward_start_ts': float(os.environ.get('REWARD_START', 1704067200)),
+        'tge_ts': float(os.environ.get('RAISE_START', 1718712000)),
         'aleph_reward_stakers_daily_base': 15000,
         'aleph_reward_nodes_daily_base': 15000,
         'ethereum_pkey': os.environ.get('ETHEREUM_PKEY'),
@@ -37,5 +38,6 @@ def get_settings():
         'pending_aggregate_key': os.environ.get('PENDING_AGGREGATE_KEY', 'pending_tokens'),
         'estimated_aggregate_key': os.environ.get('ESTIMATED_AGGREGATE_KEY', 'estimated_3yr_tokens'),
         'db_path': os.environ.get('DB_PATH', './database'),
-        'bonus_addresses': os.environ.get('BONUS_ADDRESSES', '').split(','),  # list of addresses to receive the bonus
+        'bonus_addresses': os.environ.get('BONUS_ADDRESSES', '').split(','),  # list of addresses to receive the bonus,
+        'supply_filename': os.environ.get('SUPPLY_FILENAME', 'supply.yaml'),
     }

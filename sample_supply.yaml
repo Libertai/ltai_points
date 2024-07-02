@@ -1,0 +1,31 @@
+max_supply: 60000000
+pools:
+  raise:
+    total: 15000000
+    initial: 0.5
+    type: linear
+    duration: 730
+  airdrop:
+    total: 21000000
+    type: points
+  reserves:
+    total: 15000000
+    initial: 0.3333333333333333
+    type: linear
+    duration: 2400
+  team:
+    total: 9000000
+    initial: 0.1111111111111111
+    type: linear
+    duration: 2400
+    
+allocations:
+  - address: 0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215
+    amount: 1000000
+    pool: team
+    type: instant
+  - address: 0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215
+    amount: 8000000
+    pool: team
+    type: linear
+    duration: 2400
