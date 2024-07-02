@@ -8,6 +8,7 @@ from .ethereum import get_account, mint_tokens, get_all_previous_mints, get_web3
 from .poster import post_state
 from .ltai_points import compute_points
 from .storage import get_dbs, close_dbs
+from .supply import get_supply_info
 from . import __version__
 import logging
 
@@ -34,7 +35,9 @@ async def process(settings, dbs, publish=False, mint=False):
     previous_mints, last_mint_time = await get_all_previous_mints(settings, web3)
     
     LOGGER.info(f"Starting as address {account.get_address()}")
-    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints)
+    pools, max_supply, allocations = get_supply_info(settings)
+    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints, pools, allocations)
+    # now we get supply info
     info['last_time'] = last_mint_time
     if publish:
         await post_state(settings, points, pending_points, estimated_points, info)

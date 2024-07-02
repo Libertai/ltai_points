@@ -1,5 +1,6 @@
 """Main module."""
 from .fetcher import get_account_registrations, get_aleph_rewards, get_pending_rewards, get_staked_amounts, get_corechanel_statuses
+from .supply import get_instant_allocs, get_supply_info, get_linear_allocs
 from datetime import datetime, timezone, timedelta
 from .ethereum import get_web3
 import pprint
@@ -210,7 +211,7 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
     # print(daily_ltai)
     # print(round_date, sum(staked_amounts.values()))
 
-async def compute_points(settings, dbs, previous_mints):
+async def compute_points(settings, dbs, previous_mints, pools, allocations):
     w3 = web3.Web3()
     ratio = settings['aleph_reward_ratio']
     bonus_ratio = settings['bonus_ratio']
@@ -222,7 +223,7 @@ async def compute_points(settings, dbs, previous_mints):
     settings_bonus_addresses = [w3.to_checksum_address(address) for address in settings['bonus_addresses']]
     for address in settings_bonus_addresses:
         if address not in totals:
-            totals[address] = 1000
+            totals[address] = 1000    
     
     all_bonus_addresses = [address for address, registration_time in registrations.items()
                            if registration_time < settings['bonus_limit_ts']]
@@ -230,6 +231,12 @@ async def compute_points(settings, dbs, previous_mints):
     for address in all_bonus_addresses:
         if address not in totals:
             totals[address] = 10
+
+    instant_allocs = get_instant_allocs(allocations, pools)
+    for address, value in instant_allocs.items():
+        if address not in totals:
+            totals[address] = 0
+        totals[address] += value
             
     # pending_rewards, pending_time = await get_pending_rewards(settings)
     pending_totals = {}
@@ -260,6 +267,14 @@ async def compute_points(settings, dbs, previous_mints):
             continue
             
         await process_virtual_daily_round(ddate, status, dtotals, registrations, settings)
+    total_airdrop = sum(totals.values())
+    pools['airdrop']['distributed'] = total_airdrop
+
+    linear_allocs = get_linear_allocs(settings, allocations, today, pools=pools)
+    for address, value in linear_allocs.items():
+        if address not in totals:
+            totals[address] = 0
+        totals[address] += value
 
     # now we do a virtual pending based on last amounts for today
     # what part of the day as a ratio has passed ?
@@ -276,7 +291,13 @@ async def compute_points(settings, dbs, previous_mints):
         day = (today_date + timedelta(days=i)).isoformat()
         await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
 
-
+    # now add the linear allocs to the totals
+    estimates_date = (today_date + timedelta(days=365*3)).isoformat()
+    linear_allocs = get_linear_allocs(settings, allocations, estimates_date)
+    for address, value in linear_allocs.items():
+        if address not in estimates_totals:
+            estimates_totals[address] = 0
+        estimates_totals[address] += value
 
     # now we merge this with the existing pending
     # pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
@@ -314,6 +335,7 @@ async def compute_points(settings, dbs, previous_mints):
         "daily_decay": settings['daily_decay'],
         "total_rewards": sum(totals.values()),
         "boosted_addresses": all_bonus_addresses,
+        "pools": pools
     }
     
     return totals, pending_totals, estimates_totals, info

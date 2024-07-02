@@ -20,12 +20,21 @@ pools:
     duration: 2400
     
 allocations:
-  - address: 0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215
+  - address: "0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215"
     amount: 1000000
     pool: team
     type: instant
-  - address: 0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215
+  - address: "0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215"
     amount: 8000000
     pool: team
+    type: linear
+    duration: 2400
+  - address: "0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215"
+    amount: 5000000
+    pool: reserves
+    type: instant
+  - address: "0x8430493c7CC24Df1c130f9d729Ce4FCf40F05215"
+    amount: 10000000
+    pool: reserves
     type: linear
     duration: 2400
