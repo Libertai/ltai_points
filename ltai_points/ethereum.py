@@ -196,12 +196,13 @@ async def get_logs(web3, contract, start_height, topics=None, load_mode="rpc",
                     raise
 
 
-async def get_all_previous_mints(settings, web3, logger=LOGGER, load_mode='rpc'):
+async def get_token_state(settings, web3, logger=LOGGER, load_mode='rpc'):
     tokens = get_token_contract(settings, web3)
     abi = tokens.events.Transfer._get_event_abi()
 
     topic = construct_event_topic_set(abi, web3.codec)
     mints = {}
+    balances = {}
     last_height = settings['ethereum_min_height']
 
     async for i in get_logs(web3, tokens, settings['ethereum_min_height'], topics=topic,
@@ -211,19 +212,29 @@ async def get_all_previous_mints(settings, web3, logger=LOGGER, load_mode='rpc')
         tx_hash = evt_data['transactionHash'].hex()
 
         tx_detail = evt_data['args']
-        if tx_detail['from'] != ZERO_ADDRESS:
-            continue
 
-        address = tx_detail['to']
         amount = tx_detail['value'] / (10**18)
-        mints[address] = mints.get(address, 0) + amount
+
+
+        if tx_detail['from'] != ZERO_ADDRESS:
+            balances[tx_detail['from']] = balances.get(tx_detail['from'], 0) - amount
+        else:
+            mints[tx_detail['to']] = mints.get(tx_detail['to'], 0) + amount
+        
+        balances[tx_detail['to']] = balances.get(tx_detail['to'], 0) + amount
+
+
+        # address = tx_detail['to']
+        # amount = tx_detail['value'] / (10**18)
+        # mints[address] = mints.get(address, 0) + amount
+
         if evt_data['blockNumber'] > last_height:
             last_height = evt_data['blockNumber']
     # get last block timestamp
     last_block = web3.eth.get_block(last_height)
     last_block_timestamp = last_block.timestamp
     
-    return mints, last_block_timestamp
+    return mints, balances, last_block_timestamp
 
 
 

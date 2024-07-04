@@ -44,10 +44,12 @@ allocations:
     duration: 2400
 """
 import yaml
+import web3
 from datetime import datetime, date, timezone
 
 def get_supply_info(settings):
     # we read a yaml file defined in settings with the allocs details
+    w3 = web3.Web3()
     filename = settings['supply_filename']
     with open(filename, 'r') as f:
         supply_info = yaml.safe_load(f)
@@ -58,6 +60,7 @@ def get_supply_info(settings):
         max_supply = supply_info['max_supply']
         allocations = supply_info['allocations']
         for alloc in allocations:
+            alloc['address'] = w3.to_checksum_address(alloc['address'])
             alloc['distributed'] = 0
         return pools, max_supply, allocations
     

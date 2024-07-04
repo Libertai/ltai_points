@@ -21,6 +21,20 @@ def compute_score_multiplier(score: float) -> float:
         # The score is normalized between 20% and 80%
         assert 0.2 <= score <= 0.8
         return (score - 0.2) / 0.6
+    
+def compute_reward_multiplier(ratio: float) -> float:
+    """
+    Compute the reward multiplier.
+    If ratio is between 0.9 and 1, the reward multiplier is 1.
+    If ratio is under 0.9 apply y=-sqrt(-x+0.9)+1
+    If ratio is over 1 apply y=0.5sqrt(x-1)+1
+    """
+    if ratio < 0.9:
+        return -math.sqrt(-ratio + 0.9) + 1
+    elif ratio > 1:
+        return 0.5 * math.sqrt(ratio - 1) + 1
+    else:
+        return 1
 
 async def process_round(reward_round, reward_time, totals, registrations, settings):
     ratio = settings['aleph_reward_ratio']
@@ -223,7 +237,7 @@ async def compute_points(settings, dbs, previous_mints, pools, allocations):
     settings_bonus_addresses = [w3.to_checksum_address(address) for address in settings['bonus_addresses']]
     for address in settings_bonus_addresses:
         if address not in totals:
-            totals[address] = 1000    
+            totals[address] = 1000
     
     all_bonus_addresses = [address for address, registration_time in registrations.items()
                            if registration_time < settings['bonus_limit_ts']]

@@ -4,7 +4,7 @@ import click
 import asyncio
 import math
 from .settings import get_settings
-from .ethereum import get_account, mint_tokens, get_all_previous_mints, get_web3
+from .ethereum import get_account, mint_tokens, get_web3, get_token_state
 from .poster import post_state
 from .ltai_points import compute_points
 from .storage import get_dbs, close_dbs
@@ -32,7 +32,7 @@ async def process(settings, dbs, publish=False, mint=False):
     account = get_account(settings)
     
     web3 = get_web3(settings)
-    previous_mints, last_mint_time = await get_all_previous_mints(settings, web3)
+    previous_mints, balances, last_mint_time = await get_token_state(settings, web3)
     
     LOGGER.info(f"Starting as address {account.get_address()}")
     pools, max_supply, allocations = get_supply_info(settings)
@@ -40,7 +40,7 @@ async def process(settings, dbs, publish=False, mint=False):
     # now we get supply info
     info['last_time'] = last_mint_time
     if publish:
-        await post_state(settings, points, pending_points, estimated_points, info)
+        await post_state(settings, balances, points, pending_points, estimated_points, info)
     if mint:
         to_send = {}
         for address, amount in pending_points.items():
