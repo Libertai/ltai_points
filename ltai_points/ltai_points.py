@@ -35,6 +35,16 @@ def compute_reward_multiplier(ratio: float) -> float:
         return 0.5 * math.sqrt(ratio - 1) + 1
     else:
         return 1
+    
+async def get_address_reward_multiplier(address: str, previous_mints: dict, 
+                                  balances: dict) -> float:
+    """
+    Get the reward multiplier for an address.
+    ratio = holdings / minted
+    """
+    if address not in balances or address not in previous_mints:
+        return 1
+    return compute_reward_multiplier(balances[address] / previous_mints[address])
 
 async def process_round(reward_round, reward_time, totals, registrations, settings):
     ratio = settings['aleph_reward_ratio']
@@ -225,7 +235,7 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
     # print(daily_ltai)
     # print(round_date, sum(staked_amounts.values()))
 
-async def compute_points(settings, dbs, previous_mints, pools, allocations):
+async def compute_points(settings, dbs, previous_mints, balances, pools, allocations):
     w3 = web3.Web3()
     ratio = settings['aleph_reward_ratio']
     bonus_ratio = settings['bonus_ratio']

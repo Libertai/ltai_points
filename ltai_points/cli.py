@@ -36,7 +36,7 @@ async def process(settings, dbs, publish=False, mint=False):
     
     LOGGER.info(f"Starting as address {account.get_address()}")
     pools, max_supply, allocations = get_supply_info(settings)
-    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints, pools, allocations)
+    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints, balances, pools, allocations)
     # now we get supply info
     info['last_time'] = last_mint_time
     if publish:
