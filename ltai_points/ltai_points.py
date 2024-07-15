@@ -29,6 +29,8 @@ def compute_reward_multiplier(ratio: float) -> float:
     If ratio is under 0.9 apply y=-sqrt(-x+0.9)+1
     If ratio is over 1 apply y=0.5sqrt(x-1)+1
     """
+    if ratio < 0.4:
+        return 0
     if ratio < 0.9:
         return -math.sqrt(-ratio + 0.9) + 1
     elif ratio > 1:
@@ -294,6 +296,11 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
     total_airdrop = sum(totals.values())
     pools['airdrop']['distributed'] = total_airdrop
 
+    # we apply the modifier to the rewards before adding the linear allocs
+    for address in totals:
+        reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
+        totals[address] *= reward_multiplier
+
     linear_allocs = get_linear_allocs(settings, allocations, today, pools=pools)
     for address, value in linear_allocs.items():
         if address not in totals:
@@ -314,6 +321,10 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
     for i in range(365*3):
         day = (today_date + timedelta(days=i)).isoformat()
         await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
+    # apply the reward multiplier
+    for address in estimates_totals:
+        reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
+        estimates_totals[address] *= reward_multiplier
 
     # now add the linear allocs to the totals
     estimates_date = (today_date + timedelta(days=365*3)).isoformat()
