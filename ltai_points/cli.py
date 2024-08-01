@@ -32,11 +32,13 @@ async def process(settings, dbs, publish=False, mint=False):
     account = get_account(settings)
     
     web3 = get_web3(settings)
-    previous_mints, balances, last_mint_time = await get_token_state(settings, web3)
+    previous_mints, balances, last_block_time, last_mint_time, last_distribution_times = await get_token_state(settings, web3)
     
     LOGGER.info(f"Starting as address {account.get_address()}")
     pools, max_supply, allocations = get_supply_info(settings)
-    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints, balances, pools, allocations)
+    points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints,
+                                                                          balances, pools, allocations,
+                                                                          last_mint_time, last_distribution_times)
     # now we get supply info
     info['last_time'] = last_mint_time
     if publish:

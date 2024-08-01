@@ -106,7 +106,7 @@ def compute_score_multiplier(score: float) -> float:
         assert 0.2 <= score <= 0.8
         return (score - 0.2) / 0.6
 
-async def process_virtual_daily_round(round_date, status, totals, registrations, settings):
+async def process_virtual_daily_round(round_date, status, totals, registrations, settings, day_ratio=1):
     w3 = web3.Web3()
     ratio = settings['staked_ratio']
     distrib_ratio = settings['aleph_reward_ratio']
@@ -163,7 +163,7 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
         reward = amount
         if address in bonus_addresses:
             reward *= distribution_bonus_ratio
-        totals[address] += reward
+        totals[address] += reward * day_ratio
     
     for address, value in staked_amounts.items():
         increment_address_amount(address, value * ltai_ratio)
@@ -237,11 +237,12 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
     # print(daily_ltai)
     # print(round_date, sum(staked_amounts.values()))
 
-async def compute_points(settings, dbs, previous_mints, balances, pools, allocations):
+async def compute_points(settings, dbs, previous_mints, balances, pools, allocations, last_distribution_time, last_distribution_times):
     w3 = web3.Web3()
     ratio = settings['aleph_reward_ratio']
     bonus_ratio = settings['bonus_ratio']
     totals = {}
+    pending_totals = {}
 
     registrations, counts = await get_account_registrations(settings)
     print(f"Found {len(registrations)} registrations")
@@ -257,27 +258,13 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
     for address in all_bonus_addresses:
         if address not in totals:
             totals[address] = 10
-
-    instant_allocs = get_instant_allocs(allocations, pools)
-    for address, value in instant_allocs.items():
-        if address not in totals:
-            totals[address] = 0
-        totals[address] += value
             
-    # pending_rewards, pending_time = await get_pending_rewards(settings)
-    pending_totals = {}
-    # await process_round(pending_rewards, pending_time, pending_totals, registrations, settings)
-    
     last_time = 0
     first_time = 0
-    # async for reward_round, reward_time in get_aleph_rewards(settings):
-    #     if reward_time > last_time or last_time == 0:
-    #         last_time = reward_time
-    #     if reward_time < first_time or first_time == 0:
-    #         first_time = reward_time
-    #     await process_round(reward_round, reward_time, totals, registrations, settings)
-        
-    # pending_date = datetime.fromtimestamp(pending_time, timezone.utc).date().isoformat()
+
+    last_distribution_datetime = datetime.fromtimestamp(last_distribution_time, timezone.utc)
+    last_distribution_date = datetime.fromtimestamp(last_distribution_time, timezone.utc).date().isoformat()
+    now = datetime.now(timezone.utc)
     today_date = datetime.now(timezone.utc).date()
     today = today_date.isoformat()
 
@@ -288,33 +275,75 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
         # if ddate >= pending_date:
         #     dtotals = pending_totals
             
+        # if ddate == today:
+        #     today_status = status
+        #     continue
+
         if ddate == today:
-            today_status = status
-            continue
+            # we need to process the pending rewards for today
+            ttime = None
+            if ddate == last_distribution_date:
+                # if distribution happened today, start then
+                ttime = last_distribution_time
+            else:
+                # if not, start at the beginning of the day
+                ttime = datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp()
+
+            pending_ratio = (now.timestamp() - ttime) / 86400
+            await process_virtual_daily_round(today, status, pending_totals, registrations, settings, day_ratio=pending_ratio)
+
+        elif ddate == last_distribution_date:
+            # on distribution day, pending ratio is time from distribution till midnight
+            pending_ratio = (last_distribution_datetime.replace(hour=23, minute=59, second=59).timestamp() - last_distribution_time) / 86400
+            await process_virtual_daily_round(today, status, pending_totals, registrations, settings, day_ratio=pending_ratio)
+
+        elif ddate > last_distribution_date:
+            await process_virtual_daily_round(ddate, status, dtotals, registrations, settings)
             
         await process_virtual_daily_round(ddate, status, dtotals, registrations, settings)
+
+
+
     total_airdrop = sum(totals.values())
     pools['airdrop']['distributed'] = total_airdrop
 
     # we apply the modifier to the rewards before adding the linear allocs
-    for address in totals:
+    for address in pending_totals:
         reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
         totals[address] *= reward_multiplier
 
-    linear_allocs = get_linear_allocs(settings, allocations, today, pools=pools)
+    # first handle the linear allocs from the beginning
+    linear_allocs = get_linear_allocs(settings, allocations, now, pools=pools)
     for address, value in linear_allocs.items():
-        if address not in totals:
-            totals[address] = 0
-        totals[address] += value
+        addr = w3.to_checksum_address(address)
+        if addr not in totals:
+            totals[addr] = 0
+        totals[addr] += value
 
-    # now we do a virtual pending based on last amounts for today
-    # what part of the day as a ratio has passed ?
-    # last_date is a string, let's get a timestamp at utc
-    today_time = datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp()
-    pending_ratio = (datetime.now(timezone.utc).timestamp() - today_time) / 86400
-    day_pending_reward = {}
-    await process_virtual_daily_round(today, today_status, day_pending_reward, registrations, settings)
-    day_pending_reward = {address: value * pending_ratio for address, value in day_pending_reward.items()}
+        if addr not in previous_mints:
+            # first mint, let's give it it's linear alloc
+            pending_totals[addr] = pending_totals.get(addr, 0) + value
+
+    # now we handle them since last distribution for pendings
+    linear_allocs = get_linear_allocs(settings, allocations, now, start_time=last_distribution_datetime)
+    for address, value in linear_allocs.items():
+        addr = w3.to_checksum_address(address)
+        if addr not in pending_totals:
+            pending_totals[addr] = 0
+
+        if addr in previous_mints: # we didn't distribute it whole
+            pending_totals[addr] += value
+
+    instant_allocs = get_instant_allocs(allocations, pools)
+    for address, value in instant_allocs.items():
+        addr = w3.to_checksum_address(address)
+        if addr not in totals:
+            totals[addr] = 0
+        totals[addr] += value
+
+        if addr not in previous_mints:
+            # first mint, let's give it it's instant alloc
+            pending_totals[addr] = pending_totals.get(addr, 0) + value
 
     # let's create an estimate of rewards over the next 36 months based on just today if everyone stays the same
     estimates_totals = {}
@@ -326,28 +355,13 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
         reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
         estimates_totals[address] *= reward_multiplier
 
-    # now add the linear allocs to the totals
+    # now add the linear allocs to the estimate totals
     estimates_date = (today_date + timedelta(days=365*3)).isoformat()
     linear_allocs = get_linear_allocs(settings, allocations, estimates_date)
     for address, value in linear_allocs.items():
         if address not in estimates_totals:
             estimates_totals[address] = 0
         estimates_totals[address] += value
-
-    # now we merge this with the existing pending
-    # pending_totals = {address: value + day_pending_reward.get(address, 0) for address, value in pending_totals.items()}
-    # pending_totals = day_pending_reward
-    
-    # we take the sent part of the totals, move the unsent to pending
-    for address, value in totals.items():
-        if address in previous_mints:
-            sent = previous_mints[address]
-            # if value > sent:
-            pending_totals[address] = max(value - sent, 0)
-            totals[address] = sent
-        else:
-            pending_totals[address] = value
-            totals[address] = 0
     
     pprint.pprint({
         address: (value, address in all_bonus_addresses) for address, value in totals.items()

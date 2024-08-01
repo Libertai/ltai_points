@@ -195,6 +195,13 @@ async def get_logs(web3, contract, start_height, topics=None, load_mode="rpc",
                 else:
                     raise
 
+async def lookup_timestamp(web3, block_number, block_timestamps):
+    if block_number in block_timestamps:
+        return block_timestamps[block_number]
+    block = web3.eth.get_block(block_number)
+    block_timestamps[block_number] = block.timestamp
+    return block.timestamp
+
 
 async def get_token_state(settings, web3, logger=LOGGER, load_mode='rpc'):
     tokens = get_token_contract(settings, web3)
@@ -204,6 +211,8 @@ async def get_token_state(settings, web3, logger=LOGGER, load_mode='rpc'):
     mints = {}
     balances = {}
     last_height = settings['ethereum_min_height']
+    last_mint_height = settings['ethereum_min_height']
+    last_distribution_blocks = {}
 
     async for i in get_logs(web3, tokens, settings['ethereum_min_height'], topics=topic,
                             load_mode=load_mode, logger=logger):
@@ -220,6 +229,10 @@ async def get_token_state(settings, web3, logger=LOGGER, load_mode='rpc'):
             balances[tx_detail['from']] = balances.get(tx_detail['from'], 0) - amount
         else:
             mints[tx_detail['to']] = mints.get(tx_detail['to'], 0) + amount
+            if evt_data['logIndex'] > 5 and evt_data['blockNumber'] > last_mint_height: # we have a bulk mint
+                last_mint_height = evt_data['blockNumber']
+            if last_distribution_blocks.get(tx_detail['to'], 0) < evt_data['blockNumber']:
+                last_distribution_blocks[tx_detail['to']] = evt_data['blockNumber']
         
         balances[tx_detail['to']] = balances.get(tx_detail['to'], 0) + amount
 
@@ -230,11 +243,20 @@ async def get_token_state(settings, web3, logger=LOGGER, load_mode='rpc'):
 
         if evt_data['blockNumber'] > last_height:
             last_height = evt_data['blockNumber']
-    # get last block timestamp
-    last_block = web3.eth.get_block(last_height)
-    last_block_timestamp = last_block.timestamp
     
-    return mints, balances, last_block_timestamp
+    # our block timestamps cache
+    block_timestamps = {}
+    # get last block timestamp
+    last_block_timestamp = await lookup_timestamp(web3, last_height, block_timestamps)
+    last_mint_timestamp = await lookup_timestamp(web3, last_mint_height, block_timestamps)
+    last_distribution_times = {
+        address: await lookup_timestamp(web3, block, block_timestamps)
+        for address, block in last_distribution_blocks.items()
+    }
+
+
+    
+    return mints, balances, last_block_timestamp, last_mint_timestamp, last_distribution_times
 
 
 

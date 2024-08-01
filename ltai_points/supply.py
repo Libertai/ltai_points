@@ -75,24 +75,36 @@ def get_instant_allocs(allocations, pools=None):
                     pool['distributed'] += alloc['amount']
     return instant_allocs
 
-def get_linear_allocs(settings, allocations, check_date, pools=None):
-    # check_date is a text isoformat object, we compare with settings['tge_ts'] to get the number of days since the TGE
-    # linear duration is in days.
+def get_linear_allocs(settings, allocations, check_time, start_time=None, pools=None):
     linear_allocs = {}
     tge = datetime.fromtimestamp(settings['tge_ts'], timezone.utc)
-    check_time = datetime.fromisoformat(check_date).replace(tzinfo=timezone.utc)
+    
+    if isinstance(check_time, str):
+        check_time = datetime.fromisoformat(check_time).replace(tzinfo=timezone.utc)
+    else:
+        check_time = check_time.replace(tzinfo=timezone.utc)
+    
     if check_time < tge:
         return {}
 
-    days_since_tge = (check_time - tge).days
-    
+    if start_time is None:
+        start_time = tge
+    else:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+        start_time = max(start_time, tge)  # Ensure start_time is not before TGE
+
     for alloc in allocations:
         if alloc['type'] == 'linear':
-            days_since_tge = (check_time - tge).days
             max_amount = alloc['amount']
-            daily_amount = max_amount / alloc['duration']
-            alloc_amount = min(max_amount, daily_amount * days_since_tge)
+            duration_minutes = alloc['duration'] * 24 * 60  # Convert days to minutes
+            minute_amount = max_amount / duration_minutes
+            
+            alloc_start = max(start_time, tge + timedelta(days=alloc.get('cliff', 0)))
+            minutes_since_start = max(0, (check_time - alloc_start).total_seconds() / 60)
+            
+            alloc_amount = min(max_amount, minute_amount * minutes_since_start)
             linear_allocs[alloc['address']] = linear_allocs.get(alloc['address'], 0) + alloc_amount
+            
             if pools is not None:
                 pool = pools.get(alloc['pool'], None)
                 if pool:
