@@ -45,7 +45,7 @@ allocations:
 """
 import yaml
 import web3
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 
 def get_supply_info(settings):
     # we read a yaml file defined in settings with the allocs details

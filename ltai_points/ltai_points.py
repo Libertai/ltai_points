@@ -298,9 +298,10 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
             await process_virtual_daily_round(today, status, pending_totals, registrations, settings, day_ratio=pending_ratio)
 
         elif ddate > last_distribution_date:
-            await process_virtual_daily_round(ddate, status, dtotals, registrations, settings)
-            
-        await process_virtual_daily_round(ddate, status, dtotals, registrations, settings)
+            await process_virtual_daily_round(ddate, status, pending_totals, registrations, settings)
+        
+        # in all cases add to totals
+        await process_virtual_daily_round(ddate, status, totals, registrations, settings)
 
 
 
@@ -347,13 +348,14 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
 
     # let's create an estimate of rewards over the next 36 months based on just today if everyone stays the same
     estimates_totals = {}
-    for i in range(365*3):
-        day = (today_date + timedelta(days=i)).isoformat()
-        await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
-    # apply the reward multiplier
-    for address in estimates_totals:
-        reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
-        estimates_totals[address] *= reward_multiplier
+    if today_status is not None:
+        for i in range(365*3):
+            day = (today_date + timedelta(days=i)).isoformat()
+            await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
+        # apply the reward multiplier
+        for address in estimates_totals:
+            reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
+            estimates_totals[address] *= reward_multiplier
 
     # now add the linear allocs to the estimate totals
     estimates_date = (today_date + timedelta(days=365*3)).isoformat()
