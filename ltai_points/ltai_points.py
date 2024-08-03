@@ -311,7 +311,7 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
     # we apply the modifier to the rewards before adding the linear allocs
     for address in pending_totals:
         reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
-        totals[address] *= reward_multiplier
+        pending_totals[address] *= reward_multiplier
 
     # first handle the linear allocs from the beginning
     linear_allocs = get_linear_allocs(settings, allocations, now, pools=pools)
