@@ -46,7 +46,7 @@ async def process(settings, dbs, publish=False, mint=False):
     if mint:
         to_send = {}
         for address, amount in pending_points.items():
-            if amount > 1:
+            if amount > 0.05:
                 to_send[address] = amount
                 
         print(to_send)
