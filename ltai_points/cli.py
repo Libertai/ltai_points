@@ -63,6 +63,7 @@ async def process(settings, dbs, publish=False, mint=False):
             tx_hash, last_nonce = await mint_tokens(settings, web3, dict(step_items), nonce=last_nonce)
             print(tx_hash, last_nonce)
             last_nonce += 1
+            await asyncio.sleep(5) # let's wait a bit to avoid spamming the network
 
     return points
 
