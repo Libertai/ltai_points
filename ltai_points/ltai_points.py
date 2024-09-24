@@ -38,6 +38,10 @@ def compute_reward_multiplier(ratio: float) -> float:
     else:
         return 1
     
+linked_addresses = dict()
+address_identifiers = dict()
+nodes_addresses = dict()
+    
 async def get_address_reward_multiplier(address: str, previous_mints: dict, 
                                   balances: dict) -> float:
     """
@@ -47,6 +51,16 @@ async def get_address_reward_multiplier(address: str, previous_mints: dict,
     if address not in balances or address not in previous_mints:
         return 1
     return compute_reward_multiplier(balances[address] / previous_mints[address])
+
+async def get_address_cluster_reward_multiplier(address: str, previous_mints: dict,
+                                                balances: dict):
+    """ use linked_addresses to get the reward multiplier for any address of a cluster (we add all balances together) """
+    linked_addresses = get_linked_addresses(address)
+    total_balance = sum([balances[addr] for addr in linked_addresses if addr in balances])
+    total_minted = sum([previous_mints[addr] for addr in linked_addresses if addr in previous_mints])
+    if total_minted < 100:
+        return 1
+    return compute_reward_multiplier(total_balance / total_minted)
 
 async def process_round(reward_round, reward_time, totals, registrations, settings):
     ratio = settings['aleph_reward_ratio']
@@ -105,6 +119,41 @@ def compute_score_multiplier(score: float) -> float:
         # The score is normalized between 20% and 80%
         assert 0.2 <= score <= 0.8
         return (score - 0.2) / 0.6
+
+async def link_addresses(node_hash, node_owner, reward_address):
+    """ We try to find cheaters who move their rewards to a different address
+    to game the system """
+    if node_hash not in linked_addresses:
+        nodes_addresses[node_hash] = set()
+    nodes_addresses[node_hash].add(reward_address)
+    nodes_addresses[node_hash].add(node_owner)
+    return nodes_addresses[node_hash]
+
+async def process_address_links():
+    """ populate linked_addresses based on the nodes addresses """
+    for node_hash, addresses in nodes_addresses.items():
+        for address in addresses:
+            if address not in linked_addresses:
+                linked_addresses[address] = set()
+            linked_addresses[address].update(addresses)
+    
+    for i in range(2):
+        for key, values in list(linked_addresses.items()):
+            if key not in values:
+                values.add(key)
+            for value in values:
+                if value not in linked_addresses:
+                    linked_addresses[value] = set()
+                linked_addresses[value].update(values)
+
+def get_linked_addresses(address):
+    """ we need to find all addresses linked to one in any of the node """
+    if address not in linked_addresses:
+        return set([address])
+    
+    linked_addresses[address].add(address)
+    return linked_addresses[address]
+
 
 async def process_virtual_daily_round(round_date, status, totals, registrations, settings, day_ratio=1):
     w3 = web3.Web3()
@@ -202,6 +251,7 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
                 paid_node_count += 1
             
             if paid_node_count <= settings['aleph_node_max_paid']: # we only pay the first N nodes
+                await link_addresses(rnode["hash"], rnode["owner"], rnode_reward_address)
                 increment_address_amount(rnode_reward_address, this_resource_node*distrib_decayed_ratio)
 
         if paid_node_count > settings['aleph_node_max_paid']:
@@ -227,7 +277,8 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
                 reward_address = taddress
         except Exception:
             print("Bad reward address, defaulting to owner")
-        
+
+        await link_addresses(node["hash"], node["owner"], reward_address)
         increment_address_amount(reward_address, this_node*distrib_decayed_ratio)
 
         for addr, value in node["stakers"].items():
@@ -304,13 +355,15 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
         await process_virtual_daily_round(ddate, status, totals, registrations, settings)
 
 
+    # we process the address clusters now
+    await process_address_links()
 
     total_airdrop = sum(totals.values())
     pools['airdrop']['distributed'] = total_airdrop
 
     # we apply the modifier to the rewards before adding the linear allocs
     for address in pending_totals:
-        reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
+        reward_multiplier = await get_address_cluster_reward_multiplier(address, previous_mints, balances)
         pending_totals[address] *= reward_multiplier
 
     # first handle the linear allocs from the beginning
@@ -354,7 +407,7 @@ async def compute_points(settings, dbs, previous_mints, balances, pools, allocat
             await process_virtual_daily_round(day, today_status, estimates_totals, registrations, settings)
         # apply the reward multiplier
         for address in estimates_totals:
-            reward_multiplier = await get_address_reward_multiplier(address, previous_mints, balances)
+            reward_multiplier = await get_address_cluster_reward_multiplier(address, previous_mints, balances)
             estimates_totals[address] *= reward_multiplier
 
     # now add the linear allocs to the estimate totals
