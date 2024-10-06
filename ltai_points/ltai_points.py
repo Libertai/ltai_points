@@ -215,7 +215,8 @@ async def process_virtual_daily_round(round_date, status, totals, registrations,
         totals[address] += reward * day_ratio
     
     for address, value in staked_amounts.items():
-        increment_address_amount(address, value * ltai_ratio)
+        if address:
+            increment_address_amount(address, value * ltai_ratio)
 
     for node in active_nodes:
         reward_address = node["owner"]
