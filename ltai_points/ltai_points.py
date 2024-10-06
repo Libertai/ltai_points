@@ -98,8 +98,10 @@ async def get_staked_amounts(status):
     message_totals = {}
 
     for node in status['nodes']:
-        node_address = node.get('reward', node['owner'])
-        message_totals[node_address] = message_totals.get(node_address, 0) + 200000
+        reward_address = node.get('reward', None)
+        if reward_address is None or not reward_address:
+            reward_address = node['owner']
+        message_totals[reward_address] = message_totals.get(reward_address, 0) + 200000
         for address, amount in node['stakers'].items():
             message_totals[address] = message_totals.get(address, 0) + amount
 
