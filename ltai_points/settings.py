@@ -34,7 +34,7 @@ def get_settings():
         'channel': os.environ.get('CHANNEL', 'LIBERTAI'),
         'tag': os.environ.get('TAG', 'mainnet'),
         'post_type': os.environ.get('POST_TYPE', 'calculation'),
-        'balances_aggregate_key': os.environ.get('AGGREGATE_KEY', 'tokens'),
+        'balances_aggregate_key': os.environ.get('BALANCES_AGGREGATE_KEY', 'tokens'),
         'aggregate_key': os.environ.get('AGGREGATE_KEY', 'minted_tokens'),
         'pending_aggregate_key': os.environ.get('PENDING_AGGREGATE_KEY', 'pending_tokens'),
         'estimated_aggregate_key': os.environ.get('ESTIMATED_AGGREGATE_KEY', 'estimated_3yr_tokens'),
