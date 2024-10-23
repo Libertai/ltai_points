@@ -1,7 +1,8 @@
 
-from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -41,4 +42,5 @@ def get_settings():
         'db_path': os.environ.get('DB_PATH', './database'),
         'bonus_addresses': os.environ.get('BONUS_ADDRESSES', '').split(','),  # list of addresses to receive the bonus,
         'supply_filename': os.environ.get('SUPPLY_FILENAME', 'supply.yaml'),
+        'pause_time_duration': os.environ.get('PAUSE_TIME_DURATION', 5),
     }

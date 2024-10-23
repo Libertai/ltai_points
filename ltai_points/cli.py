@@ -1,17 +1,18 @@
 """Console script for ltai_points."""
-import sys
-import click
 import asyncio
-import math
-from .settings import get_settings
-from .ethereum import get_account, mint_tokens, get_web3, get_token_state
-from .poster import post_state
-from .ltai_points import compute_points
-from .storage import get_dbs, close_dbs
-from .supply import get_supply_info
-from . import __version__
 import logging
+import math
+import sys
 
+import click
+
+from . import __version__
+from .ethereum import get_account, get_token_state, get_web3, mint_tokens
+from .ltai_points import compute_points
+from .poster import post_state
+from .settings import get_settings
+from .storage import close_dbs, get_dbs
+from .supply import get_supply_info
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,13 +28,13 @@ def setup_logging(verbose):
     logging.basicConfig(
         level=loglevel, stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
-    
+
 async def process(settings, dbs, publish=False, mint=False):
     account = get_account(settings)
-    
+
     web3 = get_web3(settings)
     previous_mints, balances, last_block_time, last_mint_time, last_distribution_times = await get_token_state(settings, web3)
-    
+
     LOGGER.info(f"Starting as address {account.get_address()}")
     pools, max_supply, allocations = get_supply_info(settings)
     points, pending_points, estimated_points, info = await compute_points(settings, dbs, previous_mints,
@@ -48,7 +49,7 @@ async def process(settings, dbs, publish=False, mint=False):
         for address, amount in pending_points.items():
             if amount > 0.05:
                 to_send[address] = amount
-                
+
         print(to_send)
 
         max_items = settings['ethereum_batch_size']
@@ -63,7 +64,7 @@ async def process(settings, dbs, publish=False, mint=False):
             tx_hash, last_nonce = await mint_tokens(settings, web3, dict(step_items), nonce=last_nonce)
             print(tx_hash, last_nonce)
             last_nonce += 1
-            await asyncio.sleep(5) # let's wait a bit to avoid spamming the network
+            await asyncio.sleep(settings['pause_time_duration']) # let's wait a bit to avoid spamming the network
 
     return points
 
